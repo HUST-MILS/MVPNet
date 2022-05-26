@@ -26,6 +26,9 @@ def prepare_data(cfg):
         if not os.path.exists(dst_folder):
             os.makedirs(dst_folder)
 
+        ## tianjia wenjian
+
+
         # Load LiDAR scan files
         scan_paths = load_files(scan_folder)
 
