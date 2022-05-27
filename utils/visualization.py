@@ -140,3 +140,6 @@ class Visualization:
             self.current_step = min(self.n_pred_steps, self.current_step + 1)
             self.update(vis)
         return False
+    
+    def play_sequence(self, vis):
+        pass
