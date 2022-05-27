@@ -38,3 +38,77 @@ def last_file(path):
 
 def first_file(path):
     return get_filename(path, 0)
+
+class Visualization:
+    """Visualization of point cloud predictions with open3D"""
+
+    def __init__(
+        self,
+        path,
+        sequence,
+        start,
+        end,
+        capture=False,
+        path_to_car_model=None,
+        sleep_time=5e-3,
+    ):
+        """Init
+
+        Args:
+            path (str): path to data should be
+              .
+              ├── sequence
+              │   ├── gt
+              |   |   ├──frame.ply
+              │   ├─── pred
+              |   |   ├── frame
+              |   │   |   ├─── (frame+1).ply
+
+            sequence (int): Sequence to visualize
+            start (int): Start at specific frame
+            end (int): End at specific frame
+            capture (bool, optional): Save to file at each frame. Defaults to False.
+            path_to_car_model (str, optional): Path to car model. Defaults to None.
+            sleep_time (float, optional): Sleep time between frames. Defaults to 5e-3.
+        """
+        self.vis = o3d.visualization.VisualizerWithKeyCallback()
+        self.vis.create_window(width=WIDTH, height=HEIGHT)
+        self.render_options = self.vis.get_render_option()
+        self.render_options.point_size = POINTSIZE
+        self.capture = capture
+
+        # Load car model
+        if path_to_car_model:
+            self.car_mesh = get_car_model(path_to_car_model)
+        else:
+            self.car_mesh = None
+
+        # Path and sequence to visualize
+        self.path = path
+        self.sequence = sequence
+
+        # Frames to visualize
+        self.start = start
+        self.end = end
+
+        # Init
+        self.current_frame = self.start
+        self.current_step = 1
+        self.n_pred_steps = 5 
+
+        # Save last view
+        self.ctr = self.vis.get_view_control()
+        self.camera = self.ctr.convert_to_pinhole_camera_parameters()
+        self.viewpoint_path = os.path.join(self.path, "viewpoint.json")
+
+        self.print_help()
+        self.update(self.vis)
+
+        # Continuous time plot
+        self.stop = False
+        self.sleep_time = sleep_time
+
+        # Initialize the default callbacks
+        self._register_key_callbacks()
+
+        self.last_time_key_pressed = time.time()
