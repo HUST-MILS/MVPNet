@@ -112,3 +112,31 @@ class Visualization:
         self._register_key_callbacks()
 
         self.last_time_key_pressed = time.time()
+    
+    def prev_frame(self, vis):
+        if time.time() - self.last_time_key_pressed > SLEEPTIME:
+            self.last_time_key_pressed = time.time()
+            self.current_frame = max(self.start, self.current_frame - 1)
+            self.update(vis)
+        return False
+
+    def next_frame(self, vis):
+        if time.time() - self.last_time_key_pressed > SLEEPTIME:
+            self.last_time_key_pressed = time.time()
+            self.current_frame = min(self.end, self.current_frame + 1)
+            self.update(vis)
+        return False
+    
+    def prev_prediction_step(self, vis):
+        if time.time() - self.last_time_key_pressed > SLEEPTIME:
+            self.last_time_key_pressed = time.time()
+            self.current_step = max(1, self.current_step - 1)
+            self.update(vis)
+        return False
+
+    def next_prediction_step(self, vis):
+        if time.time() - self.last_time_key_pressed > SLEEPTIME:
+            self.last_time_key_pressed = time.time()
+            self.current_step = min(self.n_pred_steps, self.current_step + 1)
+            self.update(vis)
+        return False
