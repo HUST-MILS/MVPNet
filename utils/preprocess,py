@@ -20,15 +20,15 @@ def prepare_data(cfg):
     for seq in sequences:
         seqstr = "{0:02d}".format(int(seq))
         scan_folder = os.path.join(os.environ.get("PCF_DATA_RAW"), seqstr, "velodyne")
+
+        # Range view
         dst_folder = os.path.join(
-            os.environ.get("PCF_DATA_PROCESSED"), seqstr, "processed"
+            os.environ.get("PCF_DATA_PROCESSED"), seqstr, "Range_processed"
         )
         if not os.path.exists(dst_folder):
             os.makedirs(dst_folder)
 
-        ## tianjia wenjian
-
-
+    
         # Load LiDAR scan files
         scan_paths = load_files(scan_folder)
 
@@ -36,7 +36,7 @@ def prepare_data(cfg):
         for idx in range(len(scan_paths)):
             print(
                 "Processing file {:d}/{:d} of sequence {:d}".format(
-                    idx, len(scan_paths), seq
+                    idx, len(scan_paths), seq 
                 )
             )
 
@@ -72,6 +72,13 @@ def prepare_data(cfg):
                 os.makedirs(dst_path_intensity)
             file_path = os.path.join(dst_path_intensity, str(idx).zfill(6))
             np.save(file_path, proj_intensity)
+        
+        # BEV view
+        dst_folder = os.path.join(
+            os.environ.get("PCF_DATA_PROCESSED"), seqstr, "BEV_processed"
+        )
+        if not os.path.exists(dst_folder):
+            os.makedirs(dst_folder)
 
 
 
