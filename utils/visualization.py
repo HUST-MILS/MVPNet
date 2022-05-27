@@ -128,7 +128,7 @@ class Visualization:
         return False
     
     def prev_prediction_step(self, vis):
-        if time.time() - self.last_time_key_pressed > SLEEPTIME:
+        if time.time() - self.last_time_key_pressed > SLEEPTIME: 
             self.last_time_key_pressed = time.time()
             self.current_step = max(1, self.current_step - 1)
             self.update(vis)
