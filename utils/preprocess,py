@@ -19,11 +19,11 @@ def prepare_data(cfg):
 
     for seq in sequences:
         seqstr = "{0:02d}".format(int(seq))
-        scan_folder = os.path.join(os.environ.get("PCF_DATA_RAW"), seqstr, "velodyne")
+        scan_folder = os.path.join(os.environ.get("PATH_TO_ORIGIN_DATA"), seqstr, "velodyne")
 
         # Range view
         dst_folder = os.path.join(
-            os.environ.get("PCF_DATA_PROCESSED"), seqstr, "Range_processed"
+            os.environ.get("PATH_TO_PROCESSED_DATA"), seqstr, "Range_processed"
         )
         if not os.path.exists(dst_folder):
             os.makedirs(dst_folder)
@@ -74,12 +74,47 @@ def prepare_data(cfg):
             np.save(file_path, proj_intensity)
         
         # BEV view
-        dst_folder = os.path.join(
-            os.environ.get("PCF_DATA_PROCESSED"), seqstr, "BEV_processed"
+        dst_folder_BEV = os.path.join(
+            os.environ.get("PATH_TO_PROCESSED_DATA"), seqstr, "BEV_processed"
         )
-        if not os.path.exists(dst_folder):
-            os.makedirs(dst_folder)
+        if not os.path.exists(dst_folder_BEV):
+            os.makedirs(dst_folder_BEV)
 
+        # Load LiDAR scan files
+        scan_paths = load_files(scan_folder)
+
+        # Iterate over all scan files
+        for idx in range(len(scan_paths)):
+            print(
+                "Processing file {:d}/{:d} of sequence {:d}".format(
+                    idx, len(scan_paths), seq 
+                )
+            )
+
+            # Load and project a point cloud
+            current_vertex = np.fromfile(scan_paths[idx], dtype=np.float32)
+            current_vertex = current_vertex.reshape((-1, 4))
+            proj_height, proj_intensity = BEV_projection(
+                current_vertex,
+                res=cfg["DATA_CONFIG"]["RES"],
+                side_range=(cfg["DATA_CONFIG"]["LEFT_RANGE"], cfg["DATA_CONFIG"]["RIGHT_RANGE"]),  # left-most to right-most
+                fwd_range = (cfg["DATA_CONFIG"]["BACK_RANGE"], cfg["DATA_CONFIG"]["FWD_RANGE"]), # back-most to forward-most
+                height_range=(cfg["DATA_CONFIG"]["DOWN_RANGE"], cfg["DATA_CONFIG"]["UP_RANGE"]) #bottom-most to upper-most
+            )
+
+            # Save BEV
+            dst_path_height= os.path.join(dst_folder_BEV, "height")
+            if not os.path.exists(dst_path_height):
+                os.makedirs(dst_path_height)
+            file_path = os.path.join(dst_path_height, str(idx).zfill(6))
+            np.save(file_path, proj_height)
+
+            # Save intensity
+            dst_path_intensity2 = os.path.join(dst_folder_BEV, "intensity")
+            if not os.path.exists(dst_path_intensity2):
+                os.makedirs(dst_path_intensity2)
+            file_path = os.path.join(dst_path_intensity2, str(idx).zfill(6))
+            np.save(file_path, proj_intensity)
 
 
 def compute_mean_and_std(cfg, train_loader):
