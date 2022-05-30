@@ -142,4 +142,40 @@ class Visualization:
         return False
     
     def play_sequence(self, vis):
-        pass
+        self.stop = False
+        while not self.stop:
+            self.next_frame(vis)
+            time.sleep(self.sleep_time)
+    
+    def stop_sequence(self, vis):
+        self.stop = True
+    
+    def toggle_capture_mode(self, vis):
+        if self.capture:
+            self.capture = False
+        else:
+            self.capture = True
+
+    def update(self, vis):
+        """Get point clouds and visualize"""
+        print(
+            "Current frame: {:d}/{:d}, Prediction step {:d}/{:d}, capture_mode: {:b}".format(
+                self.current_frame,
+                self.end,
+                self.current_step,
+                self.n_pred_steps,
+                self.capture,
+            ),
+            end="\r",
+        )
+        gt_pcd, pred_pcd = self.get_gt_and_predictions(
+            self.path, self.sequence, self.current_frame, self.current_step
+        )
+
+        geometry_list = [gt_pcd, pred_pcd]
+        if self.car_mesh:
+            geometry_list.append(self.car_mesh)
+        self.vis_update_geometries(vis, geometry_list)
+
+        if self.capture:
+            self.capture_frame()
