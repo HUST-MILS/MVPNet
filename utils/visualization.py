@@ -179,3 +179,119 @@ class Visualization:
 
         if self.capture:
             self.capture_frame()
+
+    def get_gt_and_predictions(self, path, sequence, current_frame, step):
+        """Load GT and predictions from path
+
+        Args:
+            path (str): Path to files
+            sequence (int): Sequence to visualize
+            current_frame (int): Last received frame for prediction
+            step (int): Prediction step to visualize
+
+        Returns:
+            o3d.point_cloud: GT and predicted point clouds
+        """
+        pred_path = os.path.join(
+            path,
+            sequence,
+            "pred",
+            str(current_frame).zfill(6),
+            str(current_frame + step).zfill(6) + ".ply",
+        )
+        pred_pcd = o3d.io.read_point_cloud(pred_path)
+        pred_pcd.paint_uniform_color([0, 0, 1])
+
+        gt_path = os.path.join(
+            path, sequence, "gt", str(current_frame + step).zfill(6) + ".ply"
+        )
+        gt_pcd = o3d.io.read_point_cloud(gt_path)
+        gt_pcd.paint_uniform_color([1, 0, 0])
+        return gt_pcd, pred_pcd
+
+    def vis_update_geometries(self, vis, geometries):
+        """Save camera pose and update point clouds"""
+        # Save current camera pose
+        self.camera = self.ctr.convert_to_pinhole_camera_parameters()
+
+        vis.clear_geometries()
+        for geometry in geometries:
+            vis.add_geometry(geometry)
+
+        # Set to last view
+        self.ctr.convert_from_pinhole_camera_parameters(self.camera)
+
+        self.vis.poll_events()
+        self.vis.update_renderer()
+
+    def set_render_options(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self.render_options, key, value)
+
+    def register_key_callback(self, key, callback):
+        self.vis.register_key_callback(ord(str(key)), partial(callback))
+
+    def set_white_background(self, vis):
+        """Change backround between white and white"""
+        self.render_options.background_color = [1.0, 1.0, 1.0]
+
+    def set_black_background(self, vis):
+        """Change backround between white and black"""
+        self.render_options.background_color = [0.0, 0.0, 0.0]
+
+    def save_viewpoint(self, vis):
+        """Saves viewpoint"""
+        self.camera = self.ctr.convert_to_pinhole_camera_parameters()
+        o3d.io.write_pinhole_camera_parameters(self.viewpoint_path, self.camera)
+
+    def load_viewpoint(self, vis):
+        """Loads viewpoint"""
+        self.camera = o3d.io.read_pinhole_camera_parameters(self.viewpoint_path)
+        self.ctr.convert_from_pinhole_camera_parameters(self.camera)
+    
+    def _register_key_callbacks(self):
+        self.register_key_callback("L", self.next_frame)
+        self.register_key_callback("H", self.prev_frame)
+        self.register_key_callback("K", self.next_prediction_step)
+        self.register_key_callback("J", self.prev_prediction_step)
+        self.register_key_callback("S", self.play_sequence)
+        self.register_key_callback("X", self.stop_sequence)
+        self.register_key_callback("C", self.toggle_capture_mode)
+        self.register_key_callback("W", self.set_white_background)
+        self.register_key_callback("B", self.set_black_background)
+        self.register_key_callback("V", self.save_viewpoint)
+        self.register_key_callback("Q", self.load_viewpoint)
+
+    def print_help(self):
+        print("L: next frame")
+        print("H: previous frame")
+        print("K: next prediction step")
+        print("J: previous prdeiction step")
+        print("S: start")
+        print("X: stop")
+        print("C: Toggle capture mode")
+        print("W: white background")
+        print("B: black  background")
+        print("V: save viewpoint")
+        print("Q: set to saved viewpoint")
+        print("ESC: quit")
+
+    def capture_frame(self):
+        """Save view from current viewpoint"""
+        image = self.vis.capture_screen_float_buffer(False)
+        path = os.path.join(self.path, self.sequence, "images")
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+        filename = os.path.join(
+            path,
+            "step_{:1d}_prediction_from_frame_{:05d}.png".format(
+                self.current_step, self.current_frame
+            ),
+        )
+        print("Capture image ", filename)
+        plt.imsave(filename, np.asarray(image), dpi=1)
+
+    def run(self):
+        self.vis.run()
+        self.vis.destroy_window()
