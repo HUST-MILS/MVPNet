@@ -152,9 +152,9 @@ def scale_to_255(a, min, max, dtype=np.uint8):
     return (((a - min) / float(max - min)) * 255).astype(dtype)
 
 def BEV_projection(points,
-                           res=0.1,
-                           side_range=(-20., 20.),  # left-most to right-most
-                           fwd_range = (-30., 40.), # back-most to forward-most
+                           res=0.2,
+                           side_range=(-21.6, 21.6),  # left-most to right-most
+                           fwd_range = (-48.6, 48.6), # back-most to forward-most    216*486
                            height_range=(-2., 2.),  # bottom-most to upper-most
                            ):
     """ Creates an 2D birds eye view representation of the point cloud data.
