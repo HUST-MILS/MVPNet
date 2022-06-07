@@ -7,7 +7,9 @@ import yaml
 import math
 import random
 
-from chamfer_distance import ChamferDistance
+import sys
+sys.path.append('/data/MVPNet')
+from chamfer_distance.chamfer_distance import ChamferDistance
 from utils.projection import projection
 
 class chamfer_distance(nn.Module):

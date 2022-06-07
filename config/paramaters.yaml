@@ -45,10 +45,10 @@ DATA_CONFIG:
     - 0.14 # Intensity
   
   RES: 0.1 #BEV Resolution
-  LEFT_RANGE: -20 # left-most to right-most
-  RIGHT_RANGE: 20
-  BACK_RANGE: -30 # back-most to forward-most
-  FWD_RANGE: 40
+  LEFT_RANGE: -21.6 # left-most to right-most
+  RIGHT_RANGE: 21.6
+  BACK_RANGE: -48.6 # back-most to forward-most
+  FWD_RANGE: 48.6
   DOWN_RANGE: -2 #bottom-most to upper-most
   UP_RANGE: 2
 
@@ -56,6 +56,10 @@ MODEL:
   N_PAST_STEPS: 5 # Number of input range images
   N_FUTURE_STEPS: 5 # Number of predicted future range images
   MASK_THRESHOLD: 0.5 # Threshold for valid point mask classification
+  ENCODE_DIM: 1024
+  LSTM_HIDDEN_SIZE: 1024  
+  LSTM_LAYERS_NUM: 2
+  LSTM_DIRECTIONS_NUM: 1
   USE:
     XYZ: False # If true: x,y, and z coordinates will be used as additional input channels
     INTENSITY: False # If true: intensity will be used as additional input channel

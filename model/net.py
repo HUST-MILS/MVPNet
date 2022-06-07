@@ -1,24 +1,24 @@
 from base64 import decode
-from statistics import LinearRegression
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 import yaml
 
-from model.lightning import lightning_model
+from lightning import lightning_model
 
 class Encoder(nn.Module):
     """Encode a range view tensor and a BEV tensor to a vector"""
 
     def __init__(self,cfg):
-        super().__init__(cfg)
+        super().__init__()
         'self, input_nc=3, encode_dim=1024, lstm_hidden_size=1024, seq_len=SEQ_SIZE, num_lstm_layers=1, bidirectional=False'
-        self.encode_dim = 1024
-        self.lstm_hidden_size=1024
-        self.seq_len = 5
-        self.num_lstm_layers=2
-        self.num_directions = 1 # 单项or双向lstm
+        self.encode_dim = cfg['MODEL']['ENCODE_DIM']   #1024
+        self.lstm_hidden_size = cfg['MODEL']['LSTM_HIDDEN_SIZE']  #1024
+        self.seq_len = cfg['MODEL']['N_PAST_STEPS'] #5
+        self.num_lstm_layers= cfg['MODEL']['LSTM_LAYERS_NUM']   #2
+        self.num_directions = cfg['MODEL']['LSTM_DIRECTIONS_NUM']   #1 # 单项or双向lstm
 
         self.channel1 = 1
         self.channel2 = 1
@@ -69,8 +69,8 @@ class Encoder(nn.Module):
 
         )
         
-        self.fc = nn.Linear(self.feature,self.encode_dim)
-        self.lstm = nn.LSTM(input_size=self.encode_dim,num_layers=self.num_lstm_layers,hidden_size=self.encode_dim,batch_first=True)
+        self.fc = nn.Linear(2048,self.encode_dim)
+        self.lstm = nn.LSTM(input_size=self.encode_dim,num_layers=self.num_lstm_layers,hidden_size=self.lstm_hidden_size,batch_first=True)
 
     def init_hidden(self, x):
         batch_size = x.size(0)
@@ -129,7 +129,7 @@ class Decoder(nn.Module):
     def __init__(self,cfg):
         super().__init__()
 
-        self.encode_dim = 1024
+        self.encode_dim = cfg['MODEL']['ENCODE_DIM']   #1024
         self.output_nc = 1
         self.project = nn.Sequential(
             nn.Linear(self.encode_dim, 1024*1*1),
@@ -170,6 +170,19 @@ class Decoder(nn.Module):
             decode = self.decoder(x)
             return decode
 
-class Net():
-    def __init__():
-        super().__init__()
+class Net(nn.Module):
+    def __init__(self,cfg):
+        super(Net, self).__init__()
+        self.n1 = Encoder(cfg)
+        self.n2 = Decoder(cfg)
+
+    def forward(self,x1,x2):
+        output = self.n1(x1,x2)
+        output = self.n2(output)
+        return output
+
+'''   
+cfg =yaml.safe_load(open('config/paramaters.yaml'))
+model = Net(cfg)
+print(model)
+'''
