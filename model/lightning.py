@@ -1,3 +1,4 @@
+from asyncio import futures
 import os
 import time
 import yaml
@@ -52,16 +53,123 @@ class lightning_model(LightningModule):
         pass
     
     def configure_optimizers(self):
-        return super().configure_optimizers()
+        """Optimizers"""
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.cfg["TRAIN"]["LR"])
+        scheduler = torch.optim.lr_scheduler.StepLR(
+            optimizer,
+            step_size=self.cfg["TRAIN"]["LR_EPOCH"],
+            gamma=self.cfg["TRAIN"]["LR_DECAY"],
+        )
+        return [optimizer], [scheduler]
 
-    def training_step(self, *args, **kwargs):
-        return super().training_step(*args, **kwargs)
-    
-    def validation_step(self, *args, **kwargs):
-        return super().validation_step(*args, **kwargs)
+    def training_step(self, batch, batch_idx):
+        past = batch["past_data"]
+        future = batch["fut_data"]
+        output = self.forward(past)
+        loss = self.loss(output,future,"train")
 
-    def test_step(self, *args, **kwargs):
-        return super().test_step(*args, **kwargs)
-    
+        self.log("train/loss", loss["loss"])
+        self.log("train/mean_chamfer_distance", loss["mean_chamfer_distance"])
+        self.log("train/final_chamfer_distance", loss["final_chamfer_distance"])
+        self.log("train/loss_range_view", loss["loss_range_view"])
+        self.log("train/loss_mask", loss["loss_mask"])
+
+        return loss
+
+    def validation_step(self,batch,batch_idx):
+        past = batch["past_data"]
+        future = batch["fut_data"]
+        output = self.forward(past)
+        loss = self.loss(output,future,"val")
+
+        self.log("val/loss", loss["loss"], on_epoch=True)
+        self.log(
+            "val/mean_chamfer_distance", loss["mean_chamfer_distance"], on_epoch=True
+        )
+        self.log(
+            "val/final_chamfer_distance", loss["final_chamfer_distance"], on_epoch=True
+        )
+
+        selected_sequence_and_frame = self.cfg["VALIDATION"][
+            "SELECTED_SEQUENCE_AND_FRAME"
+        ]
+        sequence_batch, frame_batch = batch["meta"]
+
+    def test_step(self,batch, batch_idx):
+        past = batch["past_data"]
+        future = batch["fut_data"]
+
+        batch_size, n_inputs, n_future_steps, H, W = past.shape
+
+        start = time.time()
+        output = self.forward(past)
+        inference_time = (time.time() - start) / batch_size
+
+        self.log("test/inference_time", inference_time, on_epoch=True)
+
+        loss = self.loss(output, future, "test")
+
+        for step, value in loss["chamfer_distance"].items():
+            self.log("test/chamfer_distance_{:d}".format(step), value, on_epoch=True)
+
+        self.log(
+            "test/mean_chamfer_distance", loss["mean_chamfer_distance"], on_epoch=True
+        )
+        self.log(
+            "test/final_chamfer_distance", loss["final_chamfer_distance"], on_epoch=True
+        )
+
+        self.chamfer_distances_tensor = torch.cat(
+            (self.chamfer_distances_tensor, loss["chamfer_distances_tensor"]), dim=1
+        )  
+        if self.cfg["TEST"]["SAVE_POINT_CLOUDS"]:
+            save_point_clouds(self.cfg, self.projection, batch, output)
+
+            sequence_batch, frame_batch = batch["meta"]
+            for sample_idx in range(frame_batch.shape[0]):
+                sequence = sequence_batch[sample_idx].item()
+                frame = frame_batch[sample_idx].item()
+                save_range_and_mask(
+                    self.cfg,
+                    self.projection,
+                    batch,
+                    output,
+                    sample_idx,
+                    sequence,
+                    frame,
+                )
+
+        return loss  
     def test_epoch_end(self, outputs):
-        return super().test_epoch_end(outputs)
+
+        self.chamfer_distances_tensor = self.chamfer_distances_tensor[:, 1:]
+        n_steps, _ = self.chamfer_distances_tensor.shape
+        mean = torch.mean(self.chamfer_distances_tensor, dim=1)
+        std = torch.std(self.chamfer_distances_tensor, dim=1)
+        q = torch.tensor([0.25, 0.5, 0.75])
+        quantile = torch.quantile(self.chamfer_distances_tensor, q, dim=1)
+
+        chamfer_distances = []
+        for s in range(n_steps):
+            chamfer_distances.append(self.chamfer_distances_tensor[s, :].tolist())
+        print("Final size of CD: ", self.chamfer_distances_tensor.shape)
+        print("Mean :", mean)
+        print("Std :", std)
+        print("Quantile :", quantile)
+
+        testdir = os.path.join(self.cfg["LOG_DIR"], "test")
+        if not os.path.exists(testdir):
+            os.makedirs(testdir)
+
+        filename = os.path.join(
+            testdir, "stats_" + time.strftime("%Y%m%d_%H%M%S") + ".yml"
+        )
+
+        log_to_save = {
+            "mean": mean.tolist(),
+            "std": std.tolist(),
+            "quantile": quantile.tolist(),
+            "chamfer_distances": chamfer_distances,
+        }
+        with open(filename, "w") as yaml_file:
+            yaml.dump(log_to_save, yaml_file, default_flow_style=False)

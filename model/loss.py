@@ -61,14 +61,69 @@ class chamfer_distance(nn.Module):
             chamfer_distances[s] = chamfer_distances[s] / batch_size
         return chamfer_distances, chamfer_distances_tensor
 class Loss(nn.Module):
-    def __init__(self,cfg):
+    def __init__(self, cfg):
+        """Init"""
         super().__init__()
         self.cfg = cfg
-        self.loss = chamfer_distance(self.cfg)
-    
-    def forward(self):
-        loss = self.loss
-        return loss
+        self.n_future_steps = self.cfg["MODEL"]["N_FUTURE_STEPS"]
+        self.loss_weight_cd = self.cfg["TRAIN"]["LOSS_WEIGHT_CHAMFER_DISTANCE"]
+        self.loss_weight_cd = 1.0
+        self.loss_weight_rv = self.cfg["TRAIN"]["LOSS_WEIGHT_RANGE_VIEW"]
+        self.loss_weight_mask = self.cfg["TRAIN"]["LOSS_WEIGHT_MASK"]
+
+
+        self.chamfer_distance = chamfer_distance(self.cfg)
+
+
+    def forward(self, output, target, mode):
+        """Forward pass with multiple loss components
+
+        Args:
+        output (dict): Predicted mask logits and ranges
+        target (torch.tensor): Target range image
+        mode (str): Mode (train,val,test)
+
+        Returns:
+        dict: Dict with loss components
+        """
+
+        target_range_image = target[:, 0, :, :, :]
+
+        # Chamfer Distance
+        if self.loss_weight_cd > 0.0 or mode == "val" or mode == "test":
+            chamfer_distance, chamfer_distances_tensor = self.chamfer_distance(
+                output, target, self.cfg["TEST"]["N_DOWNSAMPLED_POINTS_CD"]
+            )
+            loss_chamfer_distance = sum([cd for cd in chamfer_distance.values()]) / len(
+                chamfer_distance
+            )
+            detached_chamfer_distance = {
+                step: cd.detach() for step, cd in chamfer_distance.items()
+            }
+        else:
+            chamfer_distance = dict(
+                (step, torch.zeros(1).type_as(target_range_image))
+                for step in range(self.n_future_steps)
+            )
+            chamfer_distances_tensor = torch.zeros(self.n_future_steps, 1)
+
+            detached_chamfer_distance = chamfer_distance
+
+        loss = (
+            self.loss_weight_cd * loss_chamfer_distance
+        )
+
+        loss_dict = {
+            "loss": loss,
+            "chamfer_distance": detached_chamfer_distance,
+            "chamfer_distances_tensor": chamfer_distances_tensor.detach(),
+            "mean_chamfer_distance": loss_chamfer_distance.detach(),
+            "final_chamfer_distance": chamfer_distance[
+                self.n_future_steps - 1
+            ].detach(),
+        }
+        return loss_dict
+
 
 """
 class Focal_Loss(nn.Module):
